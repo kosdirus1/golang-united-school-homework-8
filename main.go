@@ -44,87 +44,124 @@ func Perform(args Arguments, writer io.Writer) error {
 	}
 	switch args["operation"] {
 	case "list":
-		_, err = writer.Write(bytes)
+		err = listOperation(bytes, writer)
 		if err != nil {
-			return errors.New(err.Error())
+			return err
 		}
 	case "add":
-		var user User
-		err = json.Unmarshal([]byte(args["item"]), &user)
+		err = addOperation(args, users, bytes, f, writer)
 		if err != nil {
-			return errors.New(err.Error())
-		}
-
-		for _, v := range users {
-			if v.Id == user.Id {
-				_, err = fmt.Fprintf(writer, "Item with id %s already exists", v.Id)
-				if err != nil {
-					return errors.New(err.Error())
-				}
-				return nil
-			}
-		}
-
-		users = append(users, user)
-		bytes, err = json.Marshal(users)
-		if err != nil {
-			return errors.New(err.Error())
-		}
-
-		err = ioutil.WriteFile(f.Name(), bytes, 0755)
-		if err != nil {
-			return errors.New(err.Error())
+			return err
 		}
 	case "remove":
-		id := args["id"]
-		var exists bool
-		for i, v := range users {
-			if v.Id == id {
-				exists = true
-				copy(users[i:], users[i+1:])
-				users[len(users)-1] = User{}
-				users = users[:len(users)-1]
-			}
+		err = removeOperation(args, users, bytes, f, writer)
+		if err != nil {
+			return err
 		}
-		if !exists {
-			_, err = writer.Write([]byte(fmt.Sprintf("Item with id %s not found", id)))
+	case "findById":
+		err = findByIdOperation(args, users, bytes, writer)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func findByIdOperation(args Arguments, users []User, bytes []byte, writer io.Writer) error {
+	id := args["id"]
+	var err error
+	var exists bool
+	for _, v := range users {
+		if v.Id == id {
+			exists = true
+			bytes, err = json.Marshal(v)
 			if err != nil {
 				return errors.New(err.Error())
 			}
-		}
-		bytes, err = json.Marshal(users)
-		if err != nil {
-			return errors.New(err.Error())
-		}
-
-		err = ioutil.WriteFile(f.Name(), bytes, 0755)
-		if err != nil {
-			return errors.New(err.Error())
-		}
-	case "findById":
-		id := args["id"]
-		var exists bool
-		for _, v := range users {
-			if v.Id == id {
-				exists = true
-				bytes, err = json.Marshal(v)
-				if err != nil {
-					return errors.New(err.Error())
-				}
-				_, err = writer.Write(bytes)
-				if err != nil {
-					return errors.New(err.Error())
-				}
-			}
-		}
-		if !exists {
-			_, err = writer.Write([]byte(""))
+			_, err = writer.Write(bytes)
 			if err != nil {
 				return errors.New(err.Error())
 			}
 		}
 	}
+	if !exists {
+		_, err = writer.Write([]byte(""))
+		if err != nil {
+			return errors.New(err.Error())
+		}
+	}
 
+	return nil
+}
+
+func removeOperation(args Arguments, users []User, bytes []byte, f *os.File, writer io.Writer) error {
+	id := args["id"]
+	var err error
+	var exists bool
+	for i, v := range users {
+		if v.Id == id {
+			exists = true
+			copy(users[i:], users[i+1:])
+			users[len(users)-1] = User{}
+			users = users[:len(users)-1]
+		}
+	}
+	if !exists {
+		_, err = writer.Write([]byte(fmt.Sprintf("Item with id %s not found", id)))
+		if err != nil {
+			return errors.New(err.Error())
+		}
+	}
+	bytes, err = json.Marshal(users)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	err = ioutil.WriteFile(f.Name(), bytes, 0755)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	return nil
+}
+
+func addOperation(args Arguments, users []User, bytes []byte, f *os.File, writer io.Writer) error {
+	var user User
+	err := json.Unmarshal([]byte(args["item"]), &user)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	for _, v := range users {
+		if v.Id == user.Id {
+			_, err = fmt.Fprintf(writer, "Item with id %s already exists", v.Id)
+			if err != nil {
+				return errors.New(err.Error())
+			}
+			return nil
+		}
+	}
+
+	users = append(users, user)
+	bytes, err = json.Marshal(users)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	err = ioutil.WriteFile(f.Name(), bytes, 0755)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	return nil
+}
+
+func listOperation(bytes []byte, writer io.Writer) error {
+	_, err := writer.Write(bytes)
+	if err != nil {
+		return errors.New(err.Error())
+	}
 	return nil
 }
 
